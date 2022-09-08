@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Terminal=false
+Exec=./mntNFS
+Comment=Mount/Unmount nfs volumes
+Icon=gnome-fs-nfs
+Name=mntNFS
+GenericName=Mount NFS volumes as Drives
