@@ -236,32 +236,43 @@ function select-mounted() {
 #------------- find-nfs-servers --------------
 function find-nfs-servers() {
 
+# look for subnets file
+# if it doesnt't exist make one and add our subnet to it. ie. 192.168.1.0/24
 
-# Find the available Servers on this subnet
+NFS_SUBNET=$(ip route | grep -E '([0-9]{1,3}\.){3}[0-9]{1,3}'/ |cut -d" " -s -f1 |grep -v 169.254 )
+
+if [ -f $NFS_PNAME.subnets ]; then
+	NFS_CURRENT_SUBNETS=$(cat $NFS_PNAME.subnets |grep -v $NFS_SUBNET ) # remove any current entry for this subnet
+fi
+
+echo -e "$NFS_SUBNET\n$NFS_CURRENT_SUBNETS" > $NFS_PNAME.subnets 	# recreate .subnets Add this subnet at the top
+
+# Find the available Servers on the subnets
 	show-progress "Initializing" "Finding Servers" \
-	"arp-scan --localnet"									# find out what NFS  servers are available on this subn
+	"arp-scan -f $NFS_PNAME.subnets"	# find out what NFS servers are available on the subnets
 	
-	NFS_LIVE_IPS=$(echo "$SP_RTN" \
+	NFS_LIVE_IPS=$(echo -e "$SP_RTN" \
 		|grep -E '([0-9]{1,3}\.){3}[0-9]{1,3}' \
 		|grep -v "Interface" \
 		|grep -v "DUP" \
-		|awk 'BEGIN{FS="\t";OFS=","} {print $1,$3,"," ;} ' \
+		|awk 'BEGIN{FS="\t";OFS=","} {print $1,$3,"\n" ;} ' \
 		|sort
 		)	
 
+							# Decide which of the live machines is an NFS server
 	NFS_TMP=""
 
 	for S_IP in $(echo "$NFS_LIVE_IPS" | awk 'BEGIN{FS=",";OFS=""} {print $1 ;} '  )
 	do
-		NFS_TMP=$(echo -e "$NFS_TMP\n"`nc -zvw3 $S_IP 2049 2>&1`)
+		NFS_TMP=`nc -zvw3 $S_IP 2049 2>&1`
+		if [ $? = "0" ]				# if nc connected sucessfully add this IP as an NFS server
+		then
+			NFS_SERVERS=$(echo "$NFS_SERVERS$S_IP")
+		fi
 	done
-	NFS_SERVERS=$(echo "$NFS_TMP"\
-	|grep "succeeded" \
-	|awk 'BEGIN{FS=" "} {print $3 ;} '\
-	)
 
 #Find the available Shares/Volumes on the Servers found above
-	AVAILABLE_VOLS=""								# Clear the variables
+	AVAILABLE_VOLS=""							# Clear the variables
 	NFS_SERVERS_AND_NAMES=""
 
 	for S_IP in $(echo "$NFS_SERVERS" | sed -e '/^$/d' )			# Find all available shares on all servers | sed -e '/^$/d' ignores blank lines
@@ -279,7 +290,6 @@ function find-nfs-servers() {
 		NFS_SERVERS_AND_NAMES=$(echo -e -n "$NFS_SERVERS_AND_NAMES\n$S_IP $S_NAME")	#2. Append the IP address and NETBIOS name to the list in $NFS_SERVERS_AND_NAMES
 	done
 }
-
 # --------------- END find-nfs-servers --------------
 #---------------- select-share -------------
 function select-share() {
@@ -340,17 +350,32 @@ export -f select-mounted select-share find-nfs-servers
 
 # We need to have
 # 1. arp-scan to allow the searching for, active machines (Potentially NFS servers)
-# 2. yad to give functional and usable dialog inputs
+# 2. mount.nfs to mount NFS volumes
+# 3. nc to interact with NFS
+# 4. yad to give functional and usable dialog inputs
 
 NOTINSTALLED_MSG=""						# Start with a blank message
 #1.. Look for arp-scan
 
-which arp-scan >>/dev/null 2>&1				# see if smbclient is installed
+which arp-scan >>/dev/null 2>&1					# see if arp-scan is installed
 if [ $? != "0" ]; then
        	NOTINSTALLED_MSG=$NOTINSTALLED_MSG"arp-scan\n"		# indicate not installed		
 fi
 
-#2.. Look for yad
+#2.. Look for mount.nfs
+
+which mount.nfs >>/dev/null 2>&1				# see if mount.nfs is installed
+if [ $? != "0" ]; then
+       	NOTINSTALLED_MSG=$NOTINSTALLED_MSG"mount.nfs\n"		# indicate not installed		
+fi
+
+#3.. Look for nc
+which nc >>/dev/null 2>&1				# see if mount.nfs is installed
+if [ $? != "0" ]; then
+       	NOTINSTALLED_MSG=$NOTINSTALLED_MSG"nc\n"		# indicate not installed		
+fi
+
+#4.. Look for yad
 
 which yad >>/dev/null 2>&1					# see if yad is installed
 if [ $? != "0" ]; then
@@ -363,8 +388,8 @@ if [ $? != "0" ]; then
 fi
 
 if [ -n "$NOTINSTALLED_MSG" ]; then
-	NOTINSTALLED_MSG=$NOTINSTALLED_MSG"not found!\n\nInstall arp-scan\n Using\n\n 'sudo dnf install arp-scan' (Fedora/RedHat)\n\n'sudo apt install arp-scan' UBUNTU/Debian"
-
+	NOTINSTALLED_MSG=$NOTINSTALLED_MSG"not found!\n\nInstall arp-scan,mount.nfs and nc\n Using\n\n 'sudo dnf install arp-scan nfs-common netcat' (Fedora/RedHat)\n\n'sudo apt install arp-scan nfs-common netcat' UBUNTU/Debian"
+ 
 	zenity	--error --no-wrap \
 	--title="Missing Dependancies" \
 	--text="$NOTINSTALLED_MSG" \
@@ -395,7 +420,6 @@ if [ ! -z $NFS_PNAME ] ; then
 	fi
 fi
 
-#xhost +si:localuser:root					# allow access to the Xserver
 which yad >>/dev/null 2>&1					# see if yad is installed
 if [ $? = "0" ]; then
 	USEYAD=true 						# Use yad if we can (Maybe suggest to install later ..note to self.. TBD)
@@ -405,7 +429,9 @@ if [ $? = "0" ]; then
 		YAD_ICON=$NFS_PNAME.png 			# Use our Icon if we can ($0.png is an icon of a timecapsule
 	       							# (Not required but just nice if we can)
 	else
-		YAD_ICON=gnome-fs-nfs				# Default Icon in the YadDialogs from system
+
+		YAD_ICON=network-server				# Default Icon in the YadDialogs from system
+#		YAD_ICON=gnome-fs-nfs				# Default Icon in the YadDialogs from system
 #		YAD_ICON=drive-harddisk				# Default Icon in the YadDialogs from system
 	fi
 	export YAD_ICON
@@ -414,6 +440,7 @@ else
 fi
 
 # Start Processing
+
 find-nfs-servers
 
 export NFS_SERVERS_AND_NAMES NFS_SERVERS AVAILABLE_VOLS					# Make availabe for the functions
@@ -444,18 +471,18 @@ do
 			| grep -iwv $NFS_IP \
 			| sed -e '/^$/d' \
 			| awk 'BEGIN{FS=" "} {OFS=" "} {print $1," - "}{$1 = ""; print $0;} ' \
-			) 								# select only and ALL lines except the last mounted Server IP
+			) 		# select only and ALL lines except the last mounted Server IP
 		fi
-#											# grep -iv ignores the last sucessful mounted server
-#											# the last mounted server. is added at the top of the list later
-#											# sed -e '/^$/d' \ removes any blank lines
-#											# Paste into one row delimted by '!' 
+					# grep -iv ignores the last sucessful mounted server
+					# the last mounted server. is added at the top of the list later
+					# sed -e '/^$/d' \ removes any blank lines
+					# Paste into one row delimted by '!' 
 		if [ -n "$CHECK_SRV" ]; then
 			CHECK_SRV="!$CHECK_SRV"						# if something found add a delimeter before it 
 		fi
 
 		set-netbiosname $NFS_VOLUME			# Get the NETBIOS name of the last used/selected server into NFS_NETBIOSNAME
-											# if it is offline dont include the pango markup set by set-netbiosname
+								# if it is offline dont include the pango markup set by set-netbiosname
 		if ! $NFS_LASTSERVERONLINE ; then
 		NFS_NETBIOSNAME="**OFFLINE**"  						# Server is offline
 	fi
@@ -465,18 +492,17 @@ do
 											# Add the last used server at the top, append "other" to allow input of a server not found above
 											# Replace the one space seperator (' ') with ' - ' (Make it pretty) like the awk paste OFS above
 #Format the Volumes list											
-		CHECK_VOLS=$(echo "$AVAILABLE_VOLS" \
+		CHECK_VOLS=$(echo -e "$AVAILABLE_VOLS" \
 		| sed -e '/^$/d' \
 		| grep -iv "$NFS_VOLUME" \
 		| tr '\n' '!'
-		) 									# select only and ALL lines for the selected Server IP the second field (Sharename)
-											# | sed -e '/^$/d' \ ignores any blank lines
-#											# grep -iv ignores the last sucessful mounted volume to avoid duplicates in the list
-#											# the last mounted vol. is added at the top of the list later
-#											# Paste into one row delimited by '!' i.e TimeCapsule!BigDisk
-		if [ -n "$CHECK_VOLS" ]; then
-			CHECK_VOLS="!$CHECK_VOLS"						# if something found add a delimeter before it 
-		fi
+		) 	# select only and ALL lines from the available shared volumes
+			# | sed -e '/^$/d' \ ignores any blank lines
+			# grep -iv ignores the last sucessful mounted volume to avoid duplicates in the list
+			# the last mounted vol. is added at the top of the list later
+			# Paste into one row delimited by '!'
+
+		CHECK_VOLS="!$CHECK_VOLS"		# if something found add a delimeter before it 
 		SEL_AVAILABLE_VOLS="$NFS_VOLUME$CHECK_VOLS other"			# Add the last used volume at the top and append "other" to allow input of a share not found above
 
 # Get the input
@@ -651,7 +677,9 @@ else		# Not yet mounted so Proceed to attempt mounting
 		show-progress "Mounting" "Attempting to mount $NFS_VOLUME" "$MNT_CMD"
 		
 
-		ERR=$(echo "$SP_RTN")							# Read any error message
+		ERR=$(echo "$SP_RTN" | grep -v "Created symlink")	# Read any error message
+									# The "Created symlink" message comes up the first time
+									# That we run but the mount suceeds, So ignore it
 
 # --- end mount (any error message is in $ERR
 
