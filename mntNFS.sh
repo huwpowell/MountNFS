@@ -21,7 +21,11 @@
 # Added the use of zenity/yad to produce dialog in Gnome
 # version 5, Modified to use NFS intead of original SMB
 # Added proper mount options to cope with NFS and x display icons for mounted drives
-
+		YAD_ICON=gnome-fs-smb				# Default Icon in the YadDialogs from system
+#		YAD_ICON=gnome-fs-ftp				# Default Icon in the YadDialogs from system
+#		YAD_ICON=gnome-fs-nfs				# Default Icon in the YadDialogs from system
+#		YAD_ICON=drive-harddisk				# Default Icon in the YadDialogs from system
+#		YAD_ICON=network-server				# Default Icon in the YadDialogs from system
 # Runs on all GNU/Linux distros (install cifs-utils) (maybe required. Try without first HHP 20200513)
 # UBUNTU needs cifs-utils and smb-client (apt install cifs-utils smb-client)
 
@@ -278,13 +282,12 @@ echo -e "$NFS_SUBNET\n$NFS_CURRENT_SUBNETS" > $NFS_PNAME.subnets 	# recreate .su
 	for S_IP in $(echo "$NFS_SERVERS" | sed -e '/^$/d' )			# Find all available shares on all servers | sed -e '/^$/d' ignores blank lines
 	do									
 		show-progress "Initializing" "Finding Shares on $S_IP" \
-		"showmount -e $S_IP"
+		"showmount -e --no-headers $S_IP"
 
-		NFS_VOLS=$(echo "$SP_RTN" | grep -v "Export list for"|awk 'BEGIN{FS=" ";OFS=""} {print $2,":",$1 ;} '  |sort)	# Select only rows without Export list for" ; Switch first and second fields
-		NFS_VOLS=$(sed 's/*/'"$S_IP"'/g' <<<$NFS_VOLS)			# Replace the character "*" with the IP of the concerned server $S_IP and print the S_IP,VOLUME
+		NFS_VOLS=$(echo "$SP_RTN" | grep -v "Export list for"|awk 'BEGIN{FS="*";OFS=""} {print "^:",$1 ;} '| sed -e 's/[[:space:]]*$//'  |sort)	# Select only rows without Export list for" ; print '^:' and the volume "| sed -e 's/[[:space:]]*$//'" removes trailing spaces
+		NFS_VOLS=$(sed 's/\^/'"$S_IP"'/g' <<<$NFS_VOLS)			# Replace the character "^" with the IP of the concerned server $S_IP and print the S_IP,VOLUME
 
 		AVAILABLE_VOLS=$(echo -e "$NFS_VOLS\n$AVAILABLE_VOLS")		# Append available servers shares to this servers shares 
-
 # Find the machine name/ID	
 		S_NAME=$(echo $NFS_LIVE_IPS |grep -w $S_IP |cut -d"," -s -f2)	#1. Find the machine name
 		NFS_SERVERS_AND_NAMES=$(echo -e -n "$NFS_SERVERS_AND_NAMES\n$S_IP $S_NAME")	#2. Append the IP address and NETBIOS name to the list in $NFS_SERVERS_AND_NAMES
@@ -305,7 +308,7 @@ function select-share() {
 
 		CHECK_VOLS=$(echo "$AVAILABLE_VOLS" | grep -iw $S_IP | grep -iwv "$NFS_VOLUME")	# Get available vols for this IP address. (Ignore last used as it is already to the top of the list
 
-		if [ -n "$CHECK_VOLS" ]							# if we found anything
+		if [ -n "$CHECK_VOLS" ]						# if we found anything
 		then
 			CHECK_VOLS=$(awk -v sname="$NFS_NETBIOSNAME" 'BEGIN{FS="|";OFS=""} {print "FALSE\n",$1,"\n",sname ;} '<<<$CHECK_VOLS) # make 2 columns (VOLUME NETBIOSNAME)
 			SELECT_VOLS=$(echo -e "$SELECT_VOLS\n$CHECK_VOLS")
@@ -430,9 +433,11 @@ if [ $? = "0" ]; then
 	       							# (Not required but just nice if we can)
 	else
 
-		YAD_ICON=network-server				# Default Icon in the YadDialogs from system
-#		YAD_ICON=gnome-fs-nfs				# Default Icon in the YadDialogs from system
+#		YAD_ICON=gnome-fs-smb				# Default Icon in the YadDialogs from system
+#		YAD_ICON=gnome-fs-ftp				# Default Icon in the YadDialogs from system
+		YAD_ICON=gnome-fs-nfs				# Default Icon in the YadDialogs from system
 #		YAD_ICON=drive-harddisk				# Default Icon in the YadDialogs from system
+#		YAD_ICON=network-server				# Default Icon in the YadDialogs from system
 	fi
 	export YAD_ICON
 else 
@@ -667,8 +672,8 @@ else		# Not yet mounted so Proceed to attempt mounting
 
 		if [ "$MOUNT_POINT" != "$MOUNT_POINT_ROOT" ]; then			# Dont try to create the mount root if mount point is not set correcly
 
-			if [ ! -d $MOUNT_POINT ]; then
-				mkdir $MOUNT_POINT		# make the mountpoint directory if required.
+			if [ ! -d "$MOUNT_POINT" ]; then
+				mkdir "$MOUNT_POINT"		# make the mountpoint directory if required.
 			fi
 		fi
 # ---------- mount and trap any error message
