@@ -23,7 +23,7 @@
 # version 5, Cloned from mntSMB and Modified to use NFS
 # Added proper mount options to cope with NFS and x display icons for mounted drives
 # Runs on all GNU/Linux distros 
-# Fedora/UBUNTU/Debian needs arp-scan and nc ([apt dnf]  install arp-scan netcat)
+# Fedora/UBUNTU/Debian needs arp-scan, nmap and nc (apt/dnf]  install arp-scan nmap netcat)
 
 #  1) Install  arp-scan and netcat (sudo [dnf apt] install arp-scan netcat)
 #  2)If you want to use the full functionality of nice dialog boxes install yad . otherwise we default to zenity *not so nice but it works)
@@ -40,6 +40,7 @@ NFS_MOUNT_POINT=/media					# Base folder for mounting (/media recommended but co
 
 TIMEOUTDELAY=5						# timeout for dialogs and messages. (in seconds)
 YADTIMEOUTDELAY=$(($TIMEOUTDELAY*4))			# Extra time for completing the initial form and where necessary
+NC_PORT=2049						# Which port to use to connect during scanning
 
 ######## !!!!!!!!!!!!!! DON'T MODIFY ANYTHING BELOW THIS LINE UNLESS YOU KNOW WHAT YOU ARE DOING !!!!!!!!!!!!!! ##########
 ######## !!!!!!!!!!!!!! DON'T MODIFY ANYTHING BELOW THIS LINE UNLESS YOU KNOW WHAT YOU ARE DOING !!!!!!!!!!!!!! ##########
@@ -296,8 +297,8 @@ function scan-subnets() {
 			for S_IP in $(echo "$NFS_SUBNET_IPS")
 			do
 				echo "# Scanning ... $S_IP"			# Tell zenity what we are doing 
-		#		NFS_TMP=`nc -zvw3 $S_IP 2049 2>&1`		# Using Showmount here is faster than NC
-				NFS_TMP=`showmount -e --no-headers $S_IP 2>&1`	# NC is the traditional way but showmount
+		#		NFS_TMP=$(nc -zvw3 $S_IP $NC_PORT 2>&1)		# Using Showmount here is faster than NC
+				NFS_TMP=$(showmount -e --no-headers $S_IP 2>&1)	# NC is the traditional way but showmount
 									# gives the same exit code (ie $?=0 for sucess)
 				if [ $? = "0" ]				# if nc connected sucessfully add this IP as an NFS server
 				then
@@ -439,7 +440,7 @@ function find-nfs-servers() {
 
 #	for S_IP in $(echo "$NFS_LIVE_IPS" | awk 'BEGIN{FS=",";OFS=""} {print $1 ;} '  )
 #	do
-#		NFS_TMP=`nc -zvw3 $S_IP 2049 2>&1`		# Using Showmount here is faster than NC
+#		NFS_TMP=$(nc -zvw3 $S_IP $NC_PORT 2>&1)		# Using Showmount here is faster than NC
 #		NFS_TMP=`showmount -e --no-headers $S_IP 2>&1`	# NC is the traditional way but showmount
 							# gives the same exit code (ie $?=0 for sucess)
 #		if [ $? = "0" ]				# if nc connected sucessfully add this IP as an NFS server
