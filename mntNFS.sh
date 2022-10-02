@@ -32,7 +32,7 @@
 #	(need to use sudo.. so run the skeleton script mntNFS which will call this script (mntNFS.sh) using sudo... Or from the CLI or Gnome Desktop 
 #		   Also, run it on logoff to umount any mounted shares (Will remove the mount point directory). Does not matter if you don't , Just cleaner if you do :)
 #
-#------ Edit these four DEFAULT options to match your system. Alternatinvely create the $0.ini file and edit that instead and save the .ini file for next time
+#------ Edit these four DEFAULT options to match your system. Alternatinvely create the .ini file and edit that instead and save the .ini file for next time
 NFS_IP="10.0.1.200"					# e.g. "192.168.1.100"
 NFS_VOLUME="10.0.0.200:/mnt/BigDisk"		# Whatever you named the NFS share"
 #------
@@ -113,7 +113,7 @@ function show-progress() {
 # use zenity progress bar to execute command with progress bar, close progress bar when complete
 # read output from the command and return to the caller in the var $SP_RTN
 	
-	SPtmp_out=$(mktemp --tmpdir `basename $0`.XXXXXXX)			# Somewhere to store any error message or output *(zenity/yad eats any return codes from any command)
+	SPtmp_out=$(mktemp --tmpdir `basename $NFS_PNAME`.XXXXXXX)			# Somewhere to store any error message or output *(zenity/yad eats any return codes from any command)
 	
 	bash -c "$3 2>&1" \
 	| tee $SPtmp_out \
@@ -277,7 +277,7 @@ function scan-subnets() {
 			| awk 'BEGIN{FS="|";OFS=""} {print $2;} '  \
 			)						# Select the subnets to scan
 
-			Stmp_out=$(mktemp --tmpdir `basename $0`.XXXXXXX)	# Somewhere to store output
+			Stmp_out=$(mktemp --tmpdir `basename $NFS_PNAME`.XXXXXXX)	# Somewhere to store output
 
 			while IFS= read -r S_SN; do
 			show-progress "Scanning" "Finding Servers on $S_SN" \
@@ -545,10 +545,55 @@ function select-share() {
 	
 	}
 
-#---------------- end select-share -------------
-export -f select-mounted select-share find-nfs-servers scan-subnets edit-file edit-subnets edit-servers
+#-------- end select-share -------
+#-------- select-mountpoint ------
+function select-mountpoint ()
+{
+while [ ! -d "$NFS_MOUNT_POINT" ]; do				# Does the mount point root exist?
+		Q_OUT=$(zenity --list \
+			--title="Mount Point Not defined" \
+			--text "Select the root mount point" \
+			--radiolist \
+			--column "sel" \
+			--column "Mount Point" \
+			TRUE "/media" \
+			FALSE "/mnt" \
+			FALSE "Other"
+			)
+	if [ -z $Q_OUT ]; then				# Most likely cancel was selected or dialog closed
+		Q_OUT="Other"				# set to Other and manually collect input
+	fi
+	
+	NEW_MOUNT_POINT="$Q_OUT"
 
-# --------------------------------------------------------------------End functions------------------------------------------------------------------------
+	if [ "$NEW_MOUNT_POINT" = "Other" ]; then
+
+		NEW_MOUNT_POINT=$(zenity --forms --width=500 --height=200 --title="Mount Point Not defined" \
+				--text="\nSelect the root mount point\n\nSuggested choices are '/media or /mnt'" \
+				--add-entry="Root Mount Point - "$NFS_MOUNT_POINT \
+				--cancel-label="Exit" \
+				--ok-label="Select This Mount Point" \
+			)
+	fi
+
+	if [ -n "$NEW_MOUNT_POINT" ]; then
+		NFS_MOUNT_POINT="$NEW_MOUNT_POINT"			# Get the user input
+	else
+		exit							# Exit whole process
+	fi
+done
+
+if [ ! -z $NFS_PNAME ] ; then
+	MOUNT_POINT_ROOT=$NFS_MOUNT_POINT"/$NFS_PNAME"	# Append the user calling user name if set as $2
+	if [ ! -d $MOUNT_POINT_ROOT ]; then
+		mkdir $MOUNT_POINT_ROOT				# make the mountpoint directory if required.
+	fi
+fi
+}
+#---------- END select-mountpoint --------
+
+export -f select-mounted select-share find-nfs-servers scan-subnets edit-file edit-subnets edit-servers select-mountpoint
+# -------------End functions-------------------------------------
 
 # -- Proceed with Main()
 
@@ -624,12 +669,7 @@ if [ -f $NFS_PNAME.last ]; then
 	. $NFS_PNAME.last				# load last sucessful mounted options if they exist (Overwrites .ini)
 fi
 
-if [ ! -z $NFS_PNAME ] ; then
-	MOUNT_POINT_ROOT=$NFS_MOUNT_POINT"/$NFS_PNAME"	# Append the user calling user name if set as $2
-	if [ ! -d $MOUNT_POINT_ROOT ]; then
-		mkdir $MOUNT_POINT_ROOT				# make the mountpoint directory if required.
-	fi
-fi
+select-mountpoint					# Decide where we are going to mount
 
 which yad >>/dev/null 2>&1					# see if yad is installed
 if [ $? = "0" ]; then
@@ -868,8 +908,8 @@ if [[ "$IS_MOUNTED" ]] ; then
 		unmount "$MOUNT_POINT"							# Attempt to unmount volume
 
 		if ! $UNMOUNT_ERR  ; then
-			if [ -f "$0.last" ]; then
-				rm -f "$0.last"						# Unmounted so delete last mounted vars temp file (restart next time with .ini file)
+			if [ -f "$NFS_PNAME.last" ]; then
+				rm -f "$NFS_PNAME.last"						# Unmounted so delete last mounted vars temp file (restart next time with .ini file)
 			fi
 		else									# unmount failed
 			exit 1
