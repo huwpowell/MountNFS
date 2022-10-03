@@ -33,10 +33,10 @@
 #		   Also, run it on logoff to umount any mounted shares (Will remove the mount point directory). Does not matter if you don't , Just cleaner if you do :)
 #
 #------ Edit these four DEFAULT options to match your system. Alternatinvely create the .ini file and edit that instead and save the .ini file for next time
-NFS_IP="10.0.1.200"					# e.g. "192.168.1.100"
-NFS_VOLUME="10.0.0.200:/mnt/BigDisk"		# Whatever you named the NFS share"
+_IP="10.0.1.200"					# e.g. "192.168.1.100"
+_VOLUME="10.0.0.200:/mnt/BigDisk"		# Whatever you named the NFS share"
 #------
-NFS_MOUNT_POINT=/media					# Base folder for mounting (/media recommended but could be /mnt or other choice)
+_MOUNT_POINT=/media					# Base folder for mounting (/media recommended but could be /mnt or other choice)
 
 TIMEOUTDELAY=5						# timeout for dialogs and messages. (in seconds)
 YADTIMEOUTDELAY=$(($TIMEOUTDELAY*4))			# Extra time for completing the initial form and where necessary
@@ -91,15 +91,15 @@ else
 	VAREXTN="$1"					# Take the extension from the arguments
 fi
 
-echo "# This file contains the variables to match your system and is included into the main script at runtime">$NFS_PNAME.$VAREXTN	# create the file
-echo "# if this file does not exist you will get the option to create it from the defaults in the main script">>$NFS_PNAME.$VAREXTN
-echo "">>$NFS_PNAME.$VAREXTN
+echo "# This file contains the variables to match your system and is included into the main script at runtime">$_PNAME.$VAREXTN	# create the file
+echo "# if this file does not exist you will get the option to create it from the defaults in the main script">>$_PNAME.$VAREXTN
+echo "">>$_PNAME.$VAREXTN
 
-echo 'NFS_IP="'"$NFS_IP"'"		# e.g. 192.168.1.100' >>$NFS_PNAME.$VAREXTN
-echo 'NFS_VOLUME="'"$NFS_VOLUME"'"	# Whatever you named the Volume share' >>$NFS_PNAME.$VAREXTN
-echo 'NFS_MOUNT_POINT="'"$NFS_MOUNT_POINT"'"	# Base folder for mounting (/media recommended but could be /mnt or other choice)' >>$NFS_PNAME.$VAREXTN
-echo "">>$NFS_PNAME.$VAREXTN
-echo "#-- Created `date` by `whoami` ----">>$NFS_PNAME.$VAREXTN
+echo '_IP="'"$_IP"'"		# e.g. 192.168.1.100' >>$_PNAME.$VAREXTN
+echo '_VOLUME="'"$_VOLUME"'"	# Whatever you named the Volume share' >>$_PNAME.$VAREXTN
+echo '_MOUNT_POINT="'"$_MOUNT_POINT"'"	# Base folder for mounting (/media recommended but could be /mnt or other choice)' >>$_PNAME.$VAREXTN
+echo "">>$_PNAME.$VAREXTN
+echo "#-- Created `date` by `whoami` ----">>$_PNAME.$VAREXTN
 } # NOTE : The user name is not saved (commented out) to enable the hostname to be set next time around. Uncomment the line in the .ini file if a specific user name is required
 
 #-------------END save-vars-----------
@@ -113,7 +113,7 @@ function show-progress() {
 # use zenity progress bar to execute command with progress bar, close progress bar when complete
 # read output from the command and return to the caller in the var $SP_RTN
 	
-	SPtmp_out=$(mktemp --tmpdir `basename $NFS_PNAME`.XXXXXXX)			# Somewhere to store any error message or output *(zenity/yad eats any return codes from any command)
+	SPtmp_out=$(mktemp --tmpdir `basename $_PNAME`.XXXXXXX)			# Somewhere to store any error message or output *(zenity/yad eats any return codes from any command)
 	
 	bash -c "$3 2>&1" \
 	| tee $SPtmp_out \
@@ -164,15 +164,15 @@ function set-netbiosname() {
 
 	if [ -z "$SNM_IP" ]; then SNM_IP="$1"; fi	# if that didnt work we where given the IP address anyway
 
-	NFS_NETBIOSNAME=$(echo "$NFS_SERVERS_AND_NAMES" \
+	_NETBIOSNAME=$(echo "$_SERVERS_AND_NAMES" \
 		|grep -iw $SNM_IP \
 		|awk '{$1 = ""; print $0;}' \
 		|sed 's/\t//' \
 		)		#1. Find the NETBIOS name "|sed 's/\t//' removes any tab characters, awk '{$2 = ""; print $0;}' print everything EXCEPT the first field *Dropping the IP address from the output 
-	NFS_LASTSERVERONLINE=true
-	if [ -z "$NFS_NETBIOSNAME" ]; then
-		NFS_NETBIOSNAME="<span foreground='red'>*OFFLINE*</span>"  				# If name not found, it is probably offline
-		NFS_LASTSERVERONLINE=false								# Show it as offline
+	_LASTSERVERONLINE=true
+	if [ -z "$_NETBIOSNAME" ]; then
+		_NETBIOSNAME="<span foreground='red'>*OFFLINE*</span>"  				# If name not found, it is probably offline
+		_LASTSERVERONLINE=false								# Show it as offline
 	fi
 }
 # -------------- END set-netbiosname -------
@@ -239,15 +239,15 @@ function scan-subnets() {
 
 # look for subnets file
 
-	if [ -f $NFS_PNAME.subnets ]; then
-		SCAN_SUBNETS=$(cat $NFS_PNAME.subnets |grep -v $NFS_SUBNET|sort -u ) # remove any current entry for this subnet and select only unique lines (No duplicates)
+	if [ -f $_PNAME.subnets ]; then
+		SCAN_SUBNETS=$(cat $_PNAME.subnets |grep -v $_SUBNET|sort -u ) # remove any current entry for this subnet and select only unique lines (No duplicates)
 	fi
 
 	if [ -n "$SCAN_SUBNETS" ]; then
-		if [ -z "$NFS_SERVERS_AND_NAMES" ]; then
+		if [ -z "$_SERVERS_AND_NAMES" ]; then
 			SCAN_KNOWN_SERVERS="None"
 		else
-			SCAN_KNOWN_SERVERS=$NFS_SERVERS_AND_NAMES
+			SCAN_KNOWN_SERVERS=$_SERVERS_AND_NAMES
 		fi
 		SCAN_SUBNETS=$(awk 'BEGIN{FS="\n";OFS=""} {print "FALSE\n",$1 ;} '<<<$SCAN_SUBNETS)
 
@@ -256,7 +256,7 @@ function scan-subnets() {
 			--checklist \
 			--multiple \
 			--title="Subnets to Scan" \
-			--text="<span><b><big><big>Contents of $NFS_PNAME.subnets\n\n</big>Select Any that you want to Scan\nthen Proceed to scan selected Subnets</big></b></span>\n\nWe can already see these servers\n$SCAN_KNOWN_SERVERS\n" \
+			--text="<span><b><big><big>Contents of $_PNAME.subnets\n\n</big>Select Any that you want to Scan\nthen Proceed to scan selected Subnets</big></b></span>\n\nWe can already see these servers\n$SCAN_KNOWN_SERVERS\n" \
 			--columns=2 \
 			--column="Sel" \
 			--column="Subnet" \
@@ -277,14 +277,14 @@ function scan-subnets() {
 			| awk 'BEGIN{FS="|";OFS=""} {print $2;} '  \
 			)						# Select the subnets to scan
 
-			Stmp_out=$(mktemp --tmpdir `basename $NFS_PNAME`.XXXXXXX)	# Somewhere to store output
+			Stmp_out=$(mktemp --tmpdir `basename $_PNAME`.XXXXXXX)	# Somewhere to store output
 
 			while IFS= read -r S_SN; do
 			show-progress "Scanning" "Finding Servers on $S_SN" \
 			"nmap -oG $Stmp_out --append-output -sn -PS2049 $S_SN" 	# find out what machines are available on the other subnets
 			done <<<$SCAN_SUBNETS
 	
-			NFS_SUBNET_IPS=$(cat "$Stmp_out" \
+			_SUBNET_IPS=$(cat "$Stmp_out" \
 			|grep "Status: Up" \
 			|grep -o -E '([0-9]{1,3}\.){3}[0-9]{1,3}' \
 			|sort -u
@@ -292,17 +292,17 @@ function scan-subnets() {
 			
 			rm -f $Stmp_out			# delete temp file after reading content
 
-			NFS_SUBNET_SERVERS=""
+			_SUBNET_SERVERS=""
 
-			for S_IP in $(echo "$NFS_SUBNET_IPS")
+			for S_IP in $(echo "$_SUBNET_IPS")
 			do
 				echo "# Scanning ... $S_IP"			# Tell zenity what we are doing 
-		#		NFS_TMP=$(nc -zvw3 $S_IP $NC_PORT 2>&1)		# Using Showmount here is faster than NC
-				NFS_TMP=$(showmount -e --no-headers $S_IP 2>&1)	# NC is the traditional way but showmount
+		#		_TMP=$(nc -zvw3 $S_IP $NC_PORT 2>&1)		# Using Showmount here is faster than NC
+				_TMP=$(showmount -e --no-headers $S_IP 2>&1)	# NC is the traditional way but showmount
 									# gives the same exit code (ie $?=0 for sucess)
 				if [ $? = "0" ]				# if nc connected sucessfully add this IP as an NFS server
 				then
-					NFS_SUBNET_SERVERS=$(echo -e "$NFS_SUBNET_SERVERS\n$S_IP")
+					_SUBNET_SERVERS=$(echo -e "$_SUBNET_SERVERS\n$S_IP")
 				fi
 			done> >(zenity --progress --pulsate  --width=250 --auto-close --no-cancel \
 				--title="Scanning for NFS servers" \
@@ -310,24 +310,24 @@ function scan-subnets() {
 				--percentage=0)					# Track progress on screen
 
 
-			if [ -n "$NFS_SUBNET_SERVERS" ]; then
+			if [ -n "$_SUBNET_SERVERS" ]; then
 
-				NFS_SUBNET_IPS=$(echo "$NFS_SUBNET_SERVERS" \
+				_SUBNET_IPS=$(echo "$_SUBNET_SERVERS" \
 				|awk -v sname="Remote Scanned" 'BEGIN{FS=" ";OFS=""} {print $1,",",sname,"\n" ;} ' \
 				)
 
-				NFS_SERVERS_FILE=""
-				if [ -f $NFS_PNAME.servers ]; then # Get all from the existing .servers file
-					NFS_SERVERS_FILE=$(cat $NFS_PNAME.servers)
+				_SERVERS_FILE=""
+				if [ -f $_PNAME.servers ]; then # Get all from the existing .servers file
+					_SERVERS_FILE=$(cat $_PNAME.servers)
  				fi
-				NFS_NEW_SERVERS=$(echo -e "$NFS_SERVERS_FILE\n$NFS_SUBNET_IPS"|sort -u -t "," -k1,1) # remove any duplicates				
-				echo "$NFS_NEW_SERVERS"|sed -e '/^$/d'|sort -u -t "," -k1,1 > $NFS_PNAME.servers	# Append IPS found to Servers for later processing, Ignore blank lines
+				_NEW_SERVERS=$(echo -e "$_SERVERS_FILE\n$_SUBNET_IPS"|sort -u -t "," -k1,1) # remove any duplicates				
+				echo "$_NEW_SERVERS"|sed -e '/^$/d'|sort -u -t "," -k1,1 > $_PNAME.servers	# Append IPS found to Servers for later processing, Ignore blank lines
 			fi
 		fi
 	else
 		zenity	--question --no-wrap \
 			--title="No subnets found" \
-			--text="No subnets found in $NFS_PNAME.subnets\n\nEdit the $NFS_PNAME.subnets file\nand try again?"
+			--text="No subnets found in $_PNAME.subnets\n\nEdit the $_PNAME.subnets file\nand try again?"
 		if [ $? = "0" ]
 		then
 			edit-subnets				# edit the subnets file
@@ -335,35 +335,35 @@ function scan-subnets() {
 		
 	fi							# end scan subnets
 
-	exec "./$NFS_PNAME"		# Restart the script with new possible server(s) in the .servers file
+	exec "./$_PNAME"		# Restart the script with new possible server(s) in the .servers file
 }
 #------------- END scan-subnets--------------
 #------------- edit-file --------------------
 function edit-file() {
 # Edit a support file
 # Inputs $1=The file extension $2=A narrative/Instructions message
-NFS_FILE="$NFS_PNAME.$1"
+_FILE="$_PNAME.$1"
 
 DOsave="N"				# Assume No Save
 
 	if [ -n "$2" ]; then				# Display a Narrative/Instructions Dialog
 		zenity --info --width=350 --timeout=$YADTIMEOUTDELAY \
-		--title="Edit : $NFS_FILE" \
+		--title="Edit : $_FILE" \
 		--text="$2"
 	fi
 
-	if [ -f $NFS_FILE ]			# read the contents of the file if it exists
+	if [ -f $_FILE ]			# read the contents of the file if it exists
 	then
-		NFS_FILE_CONTENTS=$(cat $NFS_FILE)
+		_FILE_CONTENTS=$(cat $_FILE)
 	else
-		NFS_FILE_CONTENTS=""
+		_FILE_CONTENTS=""
 	fi
 
 EDIT_TXT=$(zenity --text-info --width=350 --height=500 \
-	--title="Edit : $NFS_FILE" \
+	--title="Edit : $_FILE" \
 	--editable \
-	--checkbox="Save $NFS_FILE?" \
-	 <<<$NFS_FILE_CONTENTS \
+	--checkbox="Save $_FILE?" \
+	 <<<$_FILE_CONTENTS \
 	)
 
 	case $? in			# $? is the zenity return code
@@ -374,39 +374,39 @@ EDIT_TXT=$(zenity --text-info --width=350 --height=500 \
 					# Exit with three variables set
 					# DOsave = "Y" or "N"
 					# EDIT_TXT = whatever was returned from the edit *"" if Cancelled*
-					# NFS_FILE = Name of the file to save
+					# _FILE = Name of the file to save
 }
 # ------------ END edit-file ---------
 #------------- edit-subnets --------------------
 function edit-subnets() {
 
-	NFS_NARRATIVE="<span foreground='blue'><b><big>Enter subnets in the format xxx.xxx.xxx.xxx/mm\nor xxx.xxx.xxx.xxx or xxx.xxx.xxx\n\n</big>ie 192.168.1.0/24\nor 172.162.2.0\nor 10.0.3</b></span>"
-	edit-file subnets "$NFS_NARRATIVE"
+	_NARRATIVE="<span foreground='blue'><b><big>Enter subnets in the format xxx.xxx.xxx.xxx/mm\nor xxx.xxx.xxx.xxx or xxx.xxx.xxx\n\n</big>ie 192.168.1.0/24\nor 172.162.2.0\nor 10.0.3</b></span>"
+	edit-file subnets "$_NARRATIVE"
 
 if [ $DOsave = "Y" ]; then
-	NFS_FILE_OUT=$(echo "$EDIT_TXT" \
+	_FILE_OUT=$(echo "$EDIT_TXT" \
 	|grep -o -E '([0-9]{1,3}\.){2}[0-9]{1,3}' \
 	|awk -v mask=".0/24" 'BEGIN{OFS=""} {print $1,mask ;} ' \
 	|sort -u \
 	)
-	echo "$NFS_FILE_OUT"| sed -e '/^$/d' >$NFS_FILE	# Save any valid input to $NFS_FILE ignoring blanks
+	echo "$_FILE_OUT"| sed -e '/^$/d' >$_FILE	# Save any valid input to $_FILE ignoring blanks
 fi
 }
 # ------------ END edit-subnets ---------
 #------------- edit-servers --------------------
 function edit-servers() {
 
-	NFS_NARRATIVE="<span foreground='blue'><b><big>Enter servers in the format xxx.xxx.xxx.xxx,name\n\n</big>ie 192.168.1.106,Nas1\nor 172.162.2.6	Server2</b>\n\nSeparate the two fields with <b>ONE</b> comma (,) or <b>ONE</b> TAB\n\nPut each server on a separate line</span>"
-	edit-file servers "$NFS_NARRATIVE"
+	_NARRATIVE="<span foreground='blue'><b><big>Enter servers in the format xxx.xxx.xxx.xxx,name\n\n</big>ie 192.168.1.106,Nas1\nor 172.162.2.6	Server2</b>\n\nSeparate the two fields with <b>ONE</b> comma (,) or <b>ONE</b> TAB\n\nPut each server on a separate line</span>"
+	edit-file servers "$_NARRATIVE"
 
 	if [ $DOsave = "Y" ]; then
-		NFS_FILE_OUT=$(echo -n "$EDIT_TXT" \
+		_FILE_OUT=$(echo -n "$EDIT_TXT" \
 		|grep -E '\b((([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\.)){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]))\b' \
 		|awk 'BEGIN{FS="[,\t]";OFS=""} {print $1,",",$2,"\n" ;} ' \
 		|sort -u -t "," -k1,1 \
 		)				# grep extracts only Valid IP addresses and discards invalid
 
-	echo "$NFS_FILE_OUT"| sed -e '/^$/d' >$NFS_FILE	# Save any valid input to $NFS_FILE ignoring blanks
+	echo "$_FILE_OUT"| sed -e '/^$/d' >$_FILE	# Save any valid input to $_FILE ignoring blanks
 
 #|grep -E '(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)' \
 
@@ -417,10 +417,10 @@ function edit-servers() {
 function find-nfs-servers() {
 
 # Find the available Servers on this subnet
-	show-progress "Initializing" "Finding Servers on $NFS_SUBNET" \
+	show-progress "Initializing" "Finding Servers on $_SUBNET" \
 	"arp-scan --localnet"	# find out what NFS servers are available on the current subnet
 	
-	NFS_LIVE_IPS=$(echo -e "$SP_RTN" \
+	_LIVE_IPS=$(echo -e "$SP_RTN" \
 		|grep -E '([0-9]{1,3}\.){3}[0-9]{1,3}' \
 		|grep -v "Interface" \
 		|grep -v "DUP" \
@@ -428,34 +428,34 @@ function find-nfs-servers() {
 		|sort
 		)	
 
-		if [ -f $NFS_PNAME.servers ]; then	# Add the remote servers in .servers file
-			NFS_LIVE_IPS1=$(echo "$NFS_LIVE_IPS")
-			NFS_LIVE_IPS2=$(cat "$NFS_PNAME.servers")
-			NFS_LIVE_IPS=$(echo "$NFS_LIVE_IPS2$NFS_LIVE_IPS1"|sort -u -t "," -k1,1) # remove any duplicates
+		if [ -f $_PNAME.servers ]; then	# Add the remote servers in .servers file
+			_LIVE_IPS1=$(echo "$_LIVE_IPS")
+			_LIVE_IPS2=$(cat "$_PNAME.servers")
+			_LIVE_IPS=$(echo "$_LIVE_IPS2$_LIVE_IPS1"|sort -u -t "," -k1,1) # remove any duplicates
  		fi
 #--------------
 							# Decide which of the live machines is an NFS server
-#	NFS_TMP=""
-#	NFS_SERVERS=""
+#	_TMP=""
+#	_SERVERS=""
 
-#	for S_IP in $(echo "$NFS_LIVE_IPS" | awk 'BEGIN{FS=",";OFS=""} {print $1 ;} '  )
+#	for S_IP in $(echo "$_LIVE_IPS" | awk 'BEGIN{FS=",";OFS=""} {print $1 ;} '  )
 #	do
-#		NFS_TMP=$(nc -zvw3 $S_IP $NC_PORT 2>&1)		# Using Showmount here is faster than NC
-#		NFS_TMP=`showmount -e --no-headers $S_IP 2>&1`	# NC is the traditional way but showmount
+#		_TMP=$(nc -zvw3 $S_IP $NC_PORT 2>&1)		# Using Showmount here is faster than NC
+#		_TMP=`showmount -e --no-headers $S_IP 2>&1`	# NC is the traditional way but showmount
 							# gives the same exit code (ie $?=0 for sucess)
 #		if [ $? = "0" ]				# if nc connected sucessfully add this IP as an NFS server
 #		then
-#			NFS_SERVERS=$(echo "$NFS_SERVERS$S_IP")
+#			_SERVERS=$(echo "$_SERVERS$S_IP")
 #		fi
 #	done
 # Ignore the above and just call showmount for everything *Faster than using Netcat (nc)
 #----------------
 #Find the available Shares/Volumes on the Servers found above
 	AVAILABLE_VOLS=""							# Clear the variables
-	NFS_SERVERS=""
-	NFS_SERVERS_AND_NAMES=""
+	_SERVERS=""
+	_SERVERS_AND_NAMES=""
 #	(							# Zenity progress this loop
-	for S_IP in $(echo "$NFS_LIVE_IPS" | sed -e '/^$/d' | awk 'BEGIN{FS=",";OFS=""} {print $1 ;} '  )			# Find all available shares on all servers | sed -e '/^$/d' ignores blank lines
+	for S_IP in $(echo "$_LIVE_IPS" | sed -e '/^$/d' | awk 'BEGIN{FS=",";OFS=""} {print $1 ;} '  )			# Find all available shares on all servers | sed -e '/^$/d' ignores blank lines
 	do
 		echo "# Scanning ... $S_IP"			# Tell zenity what we are doing 
 
@@ -468,19 +468,19 @@ function find-nfs-servers() {
 			SP_RTN=""				# Show nothing found
 		fi
 		if [ -n "$SP_RTN" ]; then
-			NFS_VOLS=$(echo "$SP_RTN" | grep -v "Export list for"| grep -v "RPC: Program not registered"| grep -v "RPC: Timed out"| grep -v "Unable to receive"|awk 'BEGIN{FS="*";OFS=""} {print "^:",$1 ;} '| sed -e 's/[[:space:]]*$//'  |sort)	# Select only rows without Export list for" ; print '^:' and the volume "| sed -e 's/[[:space:]]*$//'" removes trailing spaces
+			_VOLS=$(echo "$SP_RTN" | grep -v "Export list for"| grep -v "RPC: Program not registered"| grep -v "RPC: Timed out"| grep -v "Unable to receive"|awk 'BEGIN{FS="*";OFS=""} {print "^:",$1 ;} '| sed -e 's/[[:space:]]*$//'  |sort)	# Select only rows without Export list for" ; print '^:' and the volume "| sed -e 's/[[:space:]]*$//'" removes trailing spaces
 		else
-			NFS_VOLS=""
+			_VOLS=""
 		fi
 
-		NFS_VOLS=$(sed 's/\^/'"$S_IP"'/g' <<<$NFS_VOLS)			# Replace the character "^" with the IP of the concerned server $S_IP and print the S_IP,VOLUME
+		_VOLS=$(sed 's/\^/'"$S_IP"'/g' <<<$_VOLS)			# Replace the character "^" with the IP of the concerned server $S_IP and print the S_IP,VOLUME
 		
-		if [ -n "$NFS_VOLS" ]; then				# if we found anything shared
-			AVAILABLE_VOLS=$(echo -e "$NFS_VOLS\n$AVAILABLE_VOLS")		# Append available servers shares to this servers shares 
+		if [ -n "$_VOLS" ]; then				# if we found anything shared
+			AVAILABLE_VOLS=$(echo -e "$_VOLS\n$AVAILABLE_VOLS")		# Append available servers shares to this servers shares 
 
-			S_NAME=$(echo "$NFS_LIVE_IPS" |grep -w "$S_IP" |cut -d"," -s -f2)	#1. Find the machine name
-			NFS_SERVERS=$(echo -e "$NFS_SERVERS\n$S_IP")				# 2. Recognize this IP as and NFS Server
-			NFS_SERVERS_AND_NAMES=$(echo -e -n "$NFS_SERVERS_AND_NAMES\n$S_IP $S_NAME")	#3. Append the IP address and NETBIOS name to the list in $NFS_SERVERS_AND_NAMES
+			S_NAME=$(echo "$_LIVE_IPS" |grep -w "$S_IP" |cut -d"," -s -f2)	#1. Find the machine name
+			_SERVERS=$(echo -e "$_SERVERS\n$S_IP")				# 2. Recognize this IP as and NFS Server
+			_SERVERS_AND_NAMES=$(echo -e -n "$_SERVERS_AND_NAMES\n$S_IP $S_NAME")	#3. Append the IP address and NETBIOS name to the list in $_SERVERS_AND_NAMES
 		fi
 	done> >(zenity --progress --pulsate  --width=250 --auto-close --no-cancel \
 	--title="Scanning for NFS servers" \
@@ -492,18 +492,18 @@ function find-nfs-servers() {
 #---------------- select-share -------------
 function select-share() {
 
-	YAD_DLG_TEXT=$(echo "<span><big><b><big>Select the Server and Volume data</big>\nPress Escape to use the last mounted volume</b></big>\n\n" "$NFS_VOLUME" "\n$NFS_NETBIOSNAME" "</span>")
+	YAD_DLG_TEXT=$(echo "<span><big><b><big>Select the Server and Volume data</big>\nPress Escape to use the last mounted volume</b></big>\n\n" "$_VOLUME" "\n$_NETBIOSNAME" "</span>")
 
-	set-netbiosname $NFS_VOLUME		# Get the NETBIOS name of the last used/selected server into NFS_NETBIOSNAME
-	SELECT_VOLS=$(echo -e "TRUE\n$NFS_VOLUME\n$NFS_NETBIOSNAME")	# Put the last used server and share at the top of the list
+	set-netbiosname $_VOLUME		# Get the NETBIOS name of the last used/selected server into _NETBIOSNAME
+	SELECT_VOLS=$(echo -e "TRUE\n$_VOLUME\n$_NETBIOSNAME")	# Put the last used server and share at the top of the list
 
-	for S_VOLUME in $(echo "$AVAILABLE_VOLS" | grep -iwv "$NFS_VOLUME" | sort  )		# Find all available shares on all servers except the last used "| sed -e '/^$/d'" ignores blank lines
+	for S_VOLUME in $(echo "$AVAILABLE_VOLS" | grep -iwv "$_VOLUME" | sort  )		# Find all available shares on all servers except the last used "| sed -e '/^$/d'" ignores blank lines
 	do
-		set-netbiosname $S_VOLUME			# Get the netbios name into NFS_NETBIOSNAME
+		set-netbiosname $S_VOLUME			# Get the netbios name into _NETBIOSNAME
 
 		if [ -n "$S_VOLUME" ]						# if we found anything
 		then
-			CHECK_VOL=$(echo "$S_VOLUME" | awk -v sname="$NFS_NETBIOSNAME" 'BEGIN{FS="|";OFS=""} {print "FALSE\n",$1,"\n",sname ;} ') # make 2 columns (VOLUME NETBIOSNAME)
+			CHECK_VOL=$(echo "$S_VOLUME" | awk -v sname="$_NETBIOSNAME" 'BEGIN{FS="|";OFS=""} {print "FALSE\n",$1,"\n",sname ;} ') # make 2 columns (VOLUME NETBIOSNAME)
 			SELECT_VOLS=$(echo -e "$SELECT_VOLS\n$CHECK_VOL")
 		fi
 	done
@@ -534,7 +534,7 @@ function select-share() {
 						# new possible server(s) in the .servers file
 						# *WILL RESTART THE WHOLE SCRIPT*
 
-	4) edit-servers ;exec "./$NFS_PNAME";;	# Edit .servers file directly *Will restart the script*
+	4) edit-servers ;exec "./$_PNAME";;	# Edit .servers file directly *Will restart the script*
 
 	-1|252|255) ;;				# Just here to consider any other exit return codes (see zenity and yad documentation)
 	esac
@@ -549,7 +549,7 @@ function select-share() {
 #-------- select-mountpoint ------
 function select-mountpoint ()
 {
-while [ ! -d "$NFS_MOUNT_POINT" ]; do				# Does the mount point root exist?
+while [ ! -d "$_MOUNT_POINT" ]; do				# Does the mount point root exist?
 		Q_OUT=$(zenity --list \
 			--title="Mount Point Not defined" \
 			--text "Select the root mount point" \
@@ -570,21 +570,21 @@ while [ ! -d "$NFS_MOUNT_POINT" ]; do				# Does the mount point root exist?
 
 		NEW_MOUNT_POINT=$(zenity --forms --width=500 --height=200 --title="Mount Point Not defined" \
 				--text="\nSelect the root mount point\n\nSuggested choices are '/media or /mnt'" \
-				--add-entry="Root Mount Point - "$NFS_MOUNT_POINT \
+				--add-entry="Root Mount Point - "$_MOUNT_POINT \
 				--cancel-label="Exit" \
 				--ok-label="Select This Mount Point" \
 			)
 	fi
 
 	if [ -n "$NEW_MOUNT_POINT" ]; then
-		NFS_MOUNT_POINT="$NEW_MOUNT_POINT"			# Get the user input
+		_MOUNT_POINT="$NEW_MOUNT_POINT"			# Get the user input
 	else
 		exit							# Exit whole process
 	fi
 done
 
-if [ ! -z $NFS_PNAME ] ; then
-	MOUNT_POINT_ROOT=$NFS_MOUNT_POINT"/$NFS_PNAME"	# Append the user calling user name if set as $2
+if [ ! -z $_PNAME ] ; then
+	MOUNT_POINT_ROOT=$_MOUNT_POINT"/$_PNAME"	# Append the user calling user name if set as $2
 	if [ ! -d $MOUNT_POINT_ROOT ]; then
 		mkdir $MOUNT_POINT_ROOT				# make the mountpoint directory if required.
 	fi
@@ -656,17 +656,17 @@ fi
 
 #----- Read $1 and set the User and Group ID for the mount command
 # Since we have to run this scipt using sudo we need the actual user UID. This is set by the execution script that called us
-# The UID is passed as $arg1 i.e "./mntNFS $NFS_ID" (see the mntNFS script) comes as 'uid=nnnn gid=nnnn'
+# The UID is passed as $arg1 i.e "./mntNFS $_ID" (see the mntNFS script) comes as 'uid=nnnn gid=nnnn'
 # We need to use awk to add the commas into it to use as input to mount
 
-NFS_PNAME=$2						# Get the actual name of the calling user/script
+_PNAME=$2						# Get the actual name of the calling user/script
 #
-if [ -f $NFS_PNAME.ini ]; then
-	. $NFS_PNAME.ini				# include the variables from the .ini file (Will orerwrite the above if $2.ini found)
+if [ -f $_PNAME.ini ]; then
+	. $_PNAME.ini				# include the variables from the .ini file (Will orerwrite the above if $2.ini found)
 fi
 
-if [ -f $NFS_PNAME.last ]; then						
-	. $NFS_PNAME.last				# load last sucessful mounted options if they exist (Overwrites .ini)
+if [ -f $_PNAME.last ]; then						
+	. $_PNAME.last				# load last sucessful mounted options if they exist (Overwrites .ini)
 fi
 
 select-mountpoint					# Decide where we are going to mount
@@ -676,8 +676,8 @@ if [ $? = "0" ]; then
 	USEYAD=true 						# Use yad if we can (Maybe suggest to install later ..note to self.. TBD)
 	export GDK_BACKEND=x11					# needed to make yad work correctly
 
-	if [ -f $NFS_PNAME.png ]; then
-		YAD_ICON=$NFS_PNAME.png 			# Use our Icon if we can ($0.png is an icon of a timecapsule
+	if [ -f $_PNAME.png ]; then
+		YAD_ICON=$_PNAME.png 			# Use our Icon if we can ($0.png is an icon of a timecapsule
 	       							# (Not required but just nice if we can)
 	else
 
@@ -694,17 +694,17 @@ fi
 # look for subnets file
 # if it doesnt't exist make one and add our subnet to it. ie. 192.168.1.0/24
 
-NFS_SUBNET=$(ip route | grep -E '([0-9]{1,3}\.){3}[0-9]{1,3}'/ |cut -d" " -s -f1 |grep -v 169.254 )
+_SUBNET=$(ip route | grep -E '([0-9]{1,3}\.){3}[0-9]{1,3}'/ |cut -d" " -s -f1 |grep -v 169.254 )
 
-if [ -f $NFS_PNAME.subnets ]; then
-	NFS_CURRENT_SUBNETS=$(cat $NFS_PNAME.subnets |grep -v $NFS_SUBNET ) # remove any current entry for this subnet
+if [ -f $_PNAME.subnets ]; then
+	_CURRENT_SUBNETS=$(cat $_PNAME.subnets |grep -v $_SUBNET ) # remove any current entry for this subnet
 fi
 
 # Start Processing
 
 find-nfs-servers
 
-export NFS_SERVERS_AND_NAMES NFS_SERVERS AVAILABLE_VOLS					# Make availabe for the functions
+export _SERVERS_AND_NAMES _SERVERS AVAILABLE_VOLS					# Make availabe for the functions
 
 #	First of all .. Present a total list of any mounted volumes and give options to umount if required
 	M_PROCEED='no'
@@ -716,8 +716,8 @@ export NFS_SERVERS_AND_NAMES NFS_SERVERS AVAILABLE_VOLS					# Make availabe for 
 	select-share									# Select a server and share from the selection list (Returns IP|NETBIOSNAME|SHARE)
 
 		if [ -n "$SP_RTN" ]; then
-			IFS="|" read  NFS_VOLUME NFS_NETBIOSNAME tTail<<< "$SP_RTN"  # tTail picks up any spare seperators
-			NFS_IP=$(echo $NFS_VOLUME | cut -d":" -s -f1)	# get the IP address from the volume string
+			IFS="|" read  _VOLUME _NETBIOSNAME tTail<<< "$SP_RTN"  # tTail picks up any spare seperators
+			_IP=$(echo $_VOLUME | cut -d":" -s -f1)	# get the IP address from the volume string
 		fi
 #
 # Get user input to confirm default or selected values
@@ -727,9 +727,9 @@ do
 		if $USEYAD ; then	# Use yad if we can
 # Format the server list for YAD dropdown list
 		CHECK_SRV=""							# Start with a blank list
-		if [ -n "$NFS_SERVERS_AND_NAMES" ]; then			# if we found any servers
-			CHECK_SRV=$(echo "$NFS_SERVERS_AND_NAMES" \
-			| grep -iwv $NFS_IP \
+		if [ -n "$_SERVERS_AND_NAMES" ]; then			# if we found any servers
+			CHECK_SRV=$(echo "$_SERVERS_AND_NAMES" \
+			| grep -iwv $_IP \
 			| sed -e '/^$/d' \
 			| awk 'BEGIN{FS=" "} {OFS=" "} {print $1," - "}{$1 = ""; print $0;} ' \
 			) 		# select only and ALL lines except the last mounted Server IP
@@ -742,20 +742,20 @@ do
 			CHECK_SRV="!$CHECK_SRV"						# if something found add a delimeter before it 
 		fi
 
-		set-netbiosname $NFS_VOLUME			# Get the NETBIOS name of the last used/selected server into NFS_NETBIOSNAME
+		set-netbiosname $_VOLUME			# Get the NETBIOS name of the last used/selected server into _NETBIOSNAME
 								# if it is offline dont include the pango markup set by set-netbiosname
-		if ! $NFS_LASTSERVERONLINE ; then
-		NFS_NETBIOSNAME="**OFFLINE**"  						# Server is offline
+		if ! $_LASTSERVERONLINE ; then
+		_NETBIOSNAME="**OFFLINE**"  						# Server is offline
 	fi
 
 # finally make the drop down list (Remember to consider that we changed the ' ' for '-' when we parse the result below	
-		SEL_AVAILABLE_SERVERS=$(echo $NFS_IP" - "$NFS_NETBIOSNAME$CHECK_SRV'!other' )
+		SEL_AVAILABLE_SERVERS=$(echo $_IP" - "$_NETBIOSNAME$CHECK_SRV'!other' )
 											# Add the last used server at the top, append "other" to allow input of a server not found above
 											# Replace the one space seperator (' ') with ' - ' (Make it pretty) like the awk paste OFS above
 #Format the Volumes list											
 		CHECK_VOLS=$(echo -e "$AVAILABLE_VOLS" \
 		| sed -e '/^$/d' \
-		| grep -iv "$NFS_VOLUME" \
+		| grep -iv "$_VOLUME" \
 		| tr '\n' '!'
 		) 	# select only and ALL lines from the available shared volumes
 			# | sed -e '/^$/d' \ ignores any blank lines
@@ -764,7 +764,7 @@ do
 			# Paste into one row delimited by '!'
 
 		CHECK_VOLS="!$CHECK_VOLS"		# if something found add a delimeter before it 
-		SEL_AVAILABLE_VOLS="$NFS_VOLUME$CHECK_VOLS other"			# Add the last used volume at the top and append "other" to allow input of a share not found above
+		SEL_AVAILABLE_VOLS="$_VOLUME$CHECK_VOLS other"			# Add the last used volume at the top and append "other" to allow input of a share not found above
 
 # Get the input
 		Voldetail=$(yad --form --width=700 --separator="," --center --on-top --skip-taskbar --align=right --text-align=center --buttons-layout=spread --borders=25 \
@@ -782,8 +782,8 @@ do
 
 		Voldetail=$(zenity --forms --width=500 --title="NFS Server details" --separator=","  \
 				--text="\nSelect Cancel or Timeout in $YADTIMEOUTDELAY Seconds will ignore any changes here and proceed to mount with default values\n" \
-				--add-entry="IP Address of NFS Server - "$NFS_IP \
-				--add-entry="Volume/Share to mount - "$NFS_VOLUME \
+				--add-entry="IP Address of NFS Server - "$_IP \
+				--add-entry="Volume/Share to mount - "$_VOLUME \
 				--default-cancel \
 				--ok-label="Mount - This Volume" \
 				--cancel-label="Ignore - Use Defaults" \
@@ -800,33 +800,33 @@ do
 		esac
 # got input.. validate it
 
-	IFS="," read  tNFS_IP tNFS_VOLUME tTail<<< "$Voldetail" # tTail picks up any spare seperators
+	IFS="," read  t_IP t_VOLUME tTail<<< "$Voldetail" # tTail picks up any spare seperators
 
-	tNFS_IP="$tNFS_IP "					# Add a trailing space for the 'cut' commmand below
-	tNFS_IP=$(echo "$tNFS_IP" \
+	t_IP="$t_IP "					# Add a trailing space for the 'cut' commmand below
+	t_IP=$(echo "$t_IP" \
 		|cut -d" " -s -f1 \
 		|tr -d '[:space:]')					# Get the IP address ONLY from the input
 	
 	ENTRYerr=""					# Collect the blank field names 
-	if [ -z "$tNFS_IP" ]; then ENTRYerr="$ENTRYerr IP,"
+	if [ -z "$t_IP" ]; then ENTRYerr="$ENTRYerr IP,"
 	fi
-	if [ -z "$tNFS_VOLUME" ]; then ENTRYerr="$ENTRYerr Volume,"
+	if [ -z "$t_VOLUME" ]; then ENTRYerr="$ENTRYerr Volume,"
 	fi
 
 	if [ -z "$ENTRYerr" ]; then				# no fields are blank
 
-		if [[ "$NFS_IP" != "$tNFS_IP" ]] || \
-		[[ "$NFS_VOLUME" != "$tNFS_VOLUME" ]] || \
+		if [[ "$_IP" != "$t_IP" ]] || \
+		[[ "$_VOLUME" != "$t_VOLUME" ]] || \
 	       	[[ $FORCESAVEINI ]]\
 		; then									# If anything changed or user selected save defaults button
 
 			if $USEYAD ; then		# Use yad if we can (Maybe suggest to install later ..note to self.. TBD)
 				SP_RTN=$(yad --form  --separator="," --center --on-top --skip-taskbar --align=right --text-align=center --buttons-layout=spread --borders=25 \
 					--image=document-save \
-					--title="Save $NFS_PNAME.ini" \
+					--title="Save $_PNAME.ini" \
 					--text="\n<span><b><big><big>Your Server/Share data Input</big></big></b></span>\n" \
-					--field="IP Address of NFS Server ":RO "$tNFS_IP" \
-					--field="Volume/Share to mount ":RO "$tNFS_VOLUME" \
+					--field="IP Address of NFS Server ":RO "$t_IP" \
+					--field="Volume/Share to mount ":RO "$t_VOLUME" \
 					--field="\n\n<span><b><big>Do you want to save these values as defaults?</big></b></span>\n":LBL \
 					--field="":LBL \
 					--button="Dont save":1 --button="Save as Default":0 \
@@ -834,10 +834,10 @@ do
 				)
 			else
 				SP_RTN=$(zenity --question --no-wrap \
-					--title="Save $NFS_PNAME.ini" \
+					--title="Save $_PNAME.ini" \
 					--text="\n Your Server/Share data Input \n \
-						IP Address of NFS Server - "$tNFS_IP"    \n \
-						Volume/Share to mount - "$tNFS_VOLUME"    \n \
+						IP Address of NFS Server - "$t_IP"    \n \
+						Volume/Share to mount - "$t_VOLUME"    \n \
 						\nDo you want to save these values as defaults?    " \
 					--default-cancel \
 					--ok-label="Save as Default" \
@@ -854,10 +854,10 @@ do
 
 		fi						# end check for any changes
 
-		IFS="," read  NFS_IP NFS_VOLUME tTail<<< "$Voldetail"  # tTail picks up any spare seperators
+		IFS="," read  _IP _VOLUME tTail<<< "$Voldetail"  # tTail picks up any spare seperators
 
-		NFS_IP="$NFS_IP "					# Add a trailing space for the 'cut' commmand below
-		NFS_IP=$(echo "$NFS_IP" \
+		_IP="$_IP "					# Add a trailing space for the 'cut' commmand below
+		_IP=$(echo "$_IP" \
 		|cut -d" " -s -f1 \
 		|tr -d '[:space:]')					# Get the IP address only from the input (remember we exchanged the ' ' for '-' when we formatted the list
 	
@@ -875,7 +875,7 @@ do
 
 done
 
-MOUNTDIR=$(echo $NFS_VOLUME|awk 'BEGIN{FS="/"} {print $NF ;} ')	# Get the last field from the vol name
+MOUNTDIR=$(echo $_VOLUME|awk 'BEGIN{FS="/"} {print $NF ;} ')	# Get the last field from the vol name
 MOUNT_POINT="$MOUNT_POINT_ROOT/$MOUNTDIR"			# Where we are going to mount... no need to create the directory we, will do it as we go
 
 #Start Processing mount
@@ -886,7 +886,7 @@ if [[ "$IS_MOUNTED" ]] ; then
 
 		zenity 	--question --no-wrap \
 			--title="Volume Already in use" \
-			--text="$NFS_VOLUME or something else is currently mounted at $MOUNT_POINT   \n\nDo you want to unmount and stop using it?" \
+			--text="$_VOLUME or something else is currently mounted at $MOUNT_POINT   \n\nDo you want to unmount and stop using it?" \
 			--default-cancel \
 			--ok-label="Unmount" \
 			--cancel-label="Continue Using" \
@@ -908,8 +908,8 @@ if [[ "$IS_MOUNTED" ]] ; then
 		unmount "$MOUNT_POINT"							# Attempt to unmount volume
 
 		if ! $UNMOUNT_ERR  ; then
-			if [ -f "$NFS_PNAME.last" ]; then
-				rm -f "$NFS_PNAME.last"						# Unmounted so delete last mounted vars temp file (restart next time with .ini file)
+			if [ -f "$_PNAME.last" ]; then
+				rm -f "$_PNAME.last"						# Unmounted so delete last mounted vars temp file (restart next time with .ini file)
 			fi
 		else									# unmount failed
 			exit 1
@@ -933,9 +933,9 @@ else		# Not yet mounted so Proceed to attempt mounting
 			fi
 		fi
 # ---------- mount and trap any error message
-		MNT_CMD="mount -t nfs '$NFS_VOLUME' '$MOUNT_POINT' -w -o rw,x-gvfs-show"
+		MNT_CMD="mount -t nfs '$_VOLUME' '$MOUNT_POINT' -w -o rw,x-gvfs-show"
 
-		show-progress "Mounting" "Attempting to mount $NFS_VOLUME" "$MNT_CMD"
+		show-progress "Mounting" "Attempting to mount $_VOLUME" "$MNT_CMD"
 
 		ERR=$(echo "$SP_RTN" | grep -v "Created symlink")	# Read any error message
 									# The "Created symlink" message comes up the first time
@@ -946,7 +946,7 @@ else		# Not yet mounted so Proceed to attempt mounting
 		if [ -z "$ERR" ] ; then
 			zenity	--info --no-wrap \
 				--title="Volume is Mounted" \
-				--text="Volume $NFS_VOLUME is Mounted  \n\nProceed to use it at $MOUNT_POINT  \n\n.... Success!!" \
+				--text="Volume $_VOLUME is Mounted  \n\nProceed to use it at $MOUNT_POINT  \n\n.... Success!!" \
 				--timeout=$TIMEOUTDELAY 
 
 		save-vars "last" 							# save the as the last Volume used
@@ -959,10 +959,10 @@ else		# Not yet mounted so Proceed to attempt mounting
 
 			zenity	--error --no-wrap \
 				--title="Volume is NOT Mounted" \
-				--text="Something went wrong!!...  \n\n $ERR \n\n Failed to mount NFS Volume $NFS_VOLUME at $MOUNT_POINT \ntry again  " \
+				--text="Something went wrong!!...  \n\n $ERR \n\n Failed to mount NFS Volume $_VOLUME at $MOUNT_POINT \ntry again  " \
 
 			exit 1
-		fi		# end if mount -t nfs $NFS_VOLUME
+		fi		# end if mount -t nfs $_VOLUME
 
 fi		# IS_MOUNTED
 exit 0
