@@ -416,6 +416,17 @@ function edit-servers() {
 #------------- find-nfs-servers ---------
 function find-nfs-servers() {
 
+# look for subnets file
+# if it doesnt't exist make one and add our subnet to it. ie. 192.168.1.0/24
+
+_SUBNET=$(ip route | grep -E '([0-9]{1,3}\.){3}[0-9]{1,3}'/ |cut -d" " -s -f1 |grep -v 169.254 )
+
+if [ -f $_PNAME.subnets ]; then
+	_CURRENT_SUBNETS=$(cat $_PNAME.subnets |grep -v $_SUBNET ) # remove any current entry for this subnet
+fi
+
+echo -e "$_SUBNET\n$_CURRENT_SUBNETS" > $_PNAME.subnets 	# recreate .subnets Add this subnet at the top
+
 # Find the available Servers on this subnet
 	show-progress "Initializing" "Finding Servers on $_SUBNET" \
 	"arp-scan --localnet"	# find out what NFS servers are available on the current subnet
@@ -433,23 +444,7 @@ function find-nfs-servers() {
 			_LIVE_IPS2=$(cat "$_PNAME.servers")
 			_LIVE_IPS=$(echo "$_LIVE_IPS2$_LIVE_IPS1"|sort -u -t "," -k1,1) # remove any duplicates
  		fi
-#--------------
-							# Decide which of the live machines is an NFS server
-#	_TMP=""
-#	_SERVERS=""
 
-#	for S_IP in $(echo "$_LIVE_IPS" | awk 'BEGIN{FS=",";OFS=""} {print $1 ;} '  )
-#	do
-#		_TMP=$(nc -zvw3 $S_IP $NC_PORT 2>&1)		# Using Showmount here is faster than NC
-#		_TMP=`showmount -e --no-headers $S_IP 2>&1`	# NC is the traditional way but showmount
-							# gives the same exit code (ie $?=0 for sucess)
-#		if [ $? = "0" ]				# if nc connected sucessfully add this IP as an NFS server
-#		then
-#			_SERVERS=$(echo "$_SERVERS$S_IP")
-#		fi
-#	done
-# Ignore the above and just call showmount for everything *Faster than using Netcat (nc)
-#----------------
 #Find the available Shares/Volumes on the Servers found above
 	AVAILABLE_VOLS=""							# Clear the variables
 	_SERVERS=""
@@ -934,7 +929,6 @@ else		# Not yet mounted so Proceed to attempt mounting
 		fi
 # ---------- mount and trap any error message
 		MNT_CMD="mount -t nfs '$_VOLUME' '$MOUNT_POINT' -w -o rw,x-gvfs-show"
-
 		show-progress "Mounting" "Attempting to mount $_VOLUME" "$MNT_CMD"
 
 		ERR=$(echo "$SP_RTN" | grep -v "Created symlink")	# Read any error message
@@ -944,6 +938,7 @@ else		# Not yet mounted so Proceed to attempt mounting
 # --- end mount (any error message is in $ERR
 
 		if [ -z "$ERR" ] ; then
+			mount -o x-gvfs-show,remount "$MOUNT_POINT" "$MOUNT_POINT"	# Just make sure we can see it (openSUSE)
 			zenity	--info --no-wrap \
 				--title="Volume is Mounted" \
 				--text="Volume $_VOLUME is Mounted  \n\nProceed to use it at $MOUNT_POINT  \n\n.... Success!!" \
