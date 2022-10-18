@@ -236,6 +236,9 @@ function select-mounted() {
 #------------- scan-subnets --------------
 # We scan subnets with nmap. This is slower than arp-scan and could take 30-40 seconds per subnet
 function scan-subnets() {
+local M_PROCEED='no'						# Not yet scanned
+while [ "$M_PROCEED" ]					# Keep going until scan finished
+do
 
 # look for subnets file
 
@@ -268,8 +271,9 @@ function scan-subnets() {
 		if [ $? = "4" ]
 			then
 				edit-subnets				# edit the subnets file
-				scan-subnets				# call this function again to scan any new subnets
-			fi						# Falls though to selection below
+		else
+			M_PROCEED=''					# Leave function after scan
+		fi							# Falls though to selection below
 
 		if [ -n "$OUT" ]					# if anything was selected
 			then
@@ -331,10 +335,11 @@ function scan-subnets() {
 		if [ $? = "0" ]
 		then
 			edit-subnets				# edit the subnets file
+		else
+			M_PROCEED=''				# Ignore and leave function
 		fi
-		
 	fi							# end scan subnets
-
+done
 	exec "./$_PNAME"		# Restart the script with new possible server(s) in the .servers file
 }
 #------------- END scan-subnets--------------
