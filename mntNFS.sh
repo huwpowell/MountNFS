@@ -285,7 +285,7 @@ do
 
 			while IFS= read -r S_SN; do
 			show-progress "Scanning" "Finding Servers on $S_SN" \
-			"nmap -oG $Stmp_out --append-output -sn -PS2049 $S_SN" 	# find out what machines are available on the other subnets
+			"nmap -n -oG $Stmp_out --append-output -sn -PS$NC_PORT $S_SN" 	# find out what machines are available on the other subnets
 			done <<<$SCAN_SUBNETS
 	
 			_SUBNET_IPS=$(cat "$Stmp_out" \
@@ -301,7 +301,7 @@ do
 			for S_IP in $(echo "$_SUBNET_IPS")
 			do
 				echo "# Scanning ... $S_IP"			# Tell zenity what we are doing 
-		#		_TMP=$(nc -zvw3 $S_IP $NC_PORT 2>&1)		# Using Showmount here is faster than NC
+		#		_TMP=$(nc -zw1 $S_IP $NC_PORT 2>&1)		# Using Showmount here is faster than NC
 				_TMP=$(showmount -e --no-headers $S_IP 2>&1)	# NC is the traditional way but showmount
 									# gives the same exit code (ie $?=0 for sucess)
 				if [ $? = "0" ]				# if nc connected sucessfully add this IP as an NFS server
@@ -444,7 +444,7 @@ echo -e "$_SUBNET\n$_CURRENT_SUBNETS" > $_PNAME.subnets 	# recreate .subnets Add
 		|sort
 		)	
 
-		if [ -f $_PNAME.servers ]; then	# Add the remote servers in .servers file
+		if [ -f $_PNAME.servers ]; then	# Add any remote servers that are in .servers file
 			_LIVE_IPS1=$(echo "$_LIVE_IPS")
 			_LIVE_IPS2=$(cat "$_PNAME.servers")
 			_LIVE_IPS=$(echo "$_LIVE_IPS2$_LIVE_IPS1"|sort -u -t "," -k1,1) # remove any duplicates
