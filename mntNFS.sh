@@ -36,7 +36,7 @@
 _IP="10.0.1.200"					# e.g. "192.168.1.100"
 _VOLUME="10.0.0.200:/mnt/BigDisk"		# Whatever you named the NFS share"
 #------
-_MOUNT_POINT=/media					# Base folder for mounting (/media recommended but could be /mnt or other choice)
+_MOUNT_POINT_ROOT=/media					# Base folder for mounting (/media recommended but could be /mnt or other choice)
 
 TIMEOUTDELAY=5						# timeout for dialogs and messages. (in seconds)
 YADTIMEOUTDELAY=$(($TIMEOUTDELAY*4))			# Extra time for completing the initial form and where necessary
@@ -97,7 +97,7 @@ echo "">>$_PNAME.$VAREXTN
 
 echo '_IP="'"$_IP"'"		# e.g. 192.168.1.100' >>$_PNAME.$VAREXTN
 echo '_VOLUME="'"$_VOLUME"'"	# Whatever you named the Volume share' >>$_PNAME.$VAREXTN
-echo '_MOUNT_POINT="'"$_MOUNT_POINT"'"	# Base folder for mounting (/media recommended but could be /mnt or other choice)' >>$_PNAME.$VAREXTN
+echo '_MOUNT_POINT_ROOT="'"$_MOUNT_POINT_ROOT"'" # Base folder for mounting (/media recommended but could be /mnt or other choice)' >>$_PNAME.$VAREXTN
 echo "">>$_PNAME.$VAREXTN
 echo "#-- Created `date` by `whoami` ----">>$_PNAME.$VAREXTN
 chown --reference $_PNAME $_PNAME.$VAREXTN		# Give ownership to the caller
@@ -551,44 +551,56 @@ function select-share() {
 #-------- select-mountpoint ------
 function select-mountpoint ()
 {
-while [ ! -d "$_MOUNT_POINT" ]; do				# Does the mount point root exist?
-		Q_OUT=$(zenity --list \
-			--title="Mount Point Not defined" \
-			--text "Select the root mount point" \
-			--radiolist \
-			--column "sel" \
-			--column "Mount Point" \
-			TRUE "/media" \
-			FALSE "/mnt" \
-			FALSE "Other"
-			)
-	if [ -z $Q_OUT ]; then				# Most likely cancel was selected or dialog closed
-		Q_OUT="Other"				# set to Other and manually collect input
-	fi
-	
-	NEW_MOUNT_POINT="$Q_OUT"
-
-	if [ "$NEW_MOUNT_POINT" = "Other" ]; then
-
-		NEW_MOUNT_POINT=$(zenity --forms --width=500 --height=200 --title="Mount Point Not defined" \
-				--text="\nSelect the root mount point\n\nSuggested choices are '/media or /mnt'" \
-				--add-entry="Root Mount Point - "$_MOUNT_POINT \
-				--cancel-label="Exit" \
-				--ok-label="Select This Mount Point" \
-			)
+while [ ! -d "$_MOUNT_POINT_ROOT" ]; do				# Does the mount point root exist?
+	NEW_MOUNT_POINT_ROOT=$(zenity --list \
+		--title="Mount Point Root Not defined" \
+		--text "Select the root mount point" \
+		--radiolist \
+		--column "sel" \
+		--column "Mount Point" \
+		TRUE "/media" \
+		FALSE "/mnt" \
+		FALSE "Other"
+		)
+	if [ -z "$NEW_MOUNT_POINT_ROOT" ]; then				# Most likely cancel was selected or dialog closed
+		NEW_MOUNT_POINT_ROOT="Other"				# set to Other and manually collect input
 	fi
 
-	if [ -n "$NEW_MOUNT_POINT" ]; then
-		_MOUNT_POINT="$NEW_MOUNT_POINT"			# Get the user input
+	if [ "$NEW_MOUNT_POINT_ROOT" = "Other" ]; then
+
+		NEW_MOUNT_POINT_ROOT=$(zenity --forms --width=500 --height=200 --title="Mount Point Not defined" \
+					--text="\nSelect the root mount point\n\nSuggested choices are '/media or /mnt'" \
+					--add-entry="Root Mount Point - " \
+					--cancel-label="Exit" \
+					--ok-label="Select This Mount Point" \
+					)
+		NEW_MOUNT_POINT_ROOT="/$NEW_MOUNT_POINT_ROOT"			# Add the root slash
+	fi
+
+	if [ "$NEW_MOUNT_POINT_ROOT" != "/" ]; then				# Did we get any input?
+		if [ ! -d "$NEW_MOUNT_POINT_ROOT" ]; then			# Does the root mount point exist?
+			$(zenity --question --title="Root Mount Point does not exist" \
+			--width=350 \
+			--text="\nRoot mount point does not exist\n\nDo you want to create $NEW_MOUNT_POINT_ROOT" \
+			--cancel-label="Exit" \
+			--ok-label="Create Mount Point Root" \
+			)
+			if [ ! $? = "0" ]; then					# OK not Selected
+				exit						# Exit whole process if No
+			else
+				mkdir $NEW_MOUNT_POINT_ROOT			# Cre8 the root mount point
+			fi
+		fi
 	else
-		exit							# Exit whole process
+		exit								# Exit whole process if no input
 	fi
+	_MOUNT_POINT_ROOT=$NEW_MOUNT_POINT_ROOT					# Keep the resultnged root mount point
 done
 
 if [ ! -z $_PNAME ] ; then
-	MOUNT_POINT_ROOT=$_MOUNT_POINT"/$_PNAME"	# Append the user calling user name if set as $2
+	MOUNT_POINT_ROOT=$_MOUNT_POINT_ROOT"/$_PNAME"		# Append the calling name if set as $2
 	if [ ! -d $MOUNT_POINT_ROOT ]; then
-		mkdir $MOUNT_POINT_ROOT			# make the mountpoint directory if required.
+		mkdir $MOUNT_POINT_ROOT				# make the mountpoint directory if required.
 		chown --reference $_PNAME $MOUNT_POINT_ROOT	# Give ownership to the caller
 	fi
 fi
@@ -683,8 +695,6 @@ fi
 if [ -f $_PNAME.last ]; then						
 	. $_PNAME.last				# load last sucessful mounted options if they exist (Overwrites .ini)
 fi
-
-select-mountpoint					# Decide where we are going to mount
 
 which yad >>/dev/null 2>&1					# see if yad is installed
 if [ $? = "0" ]; then
@@ -877,6 +887,7 @@ do
 		|tr -d '[:space:]')					# Get the IP address only from the input (remember we exchanged the ' ' for '-' when we formatted the list
 	
 		InputPending=false					# got the input that we wanted, None of the fields are blank, moved them into the variables and continue
+		select-mountpoint					# Define the root mount point
 
 		if [[ "$DOsave_vars" = "Y" ]]; then			# save the input as default for next time
 			save-vars "ini"
@@ -968,7 +979,7 @@ echo ..
 				--text="Volume $_VOLUME is Mounted  \n\nProceed to use it at $MOUNT_POINT  \n\n.... Success!!" \
 				--timeout=$TIMEOUTDELAY 
 
-		save-vars "last" 							# save the as the last Volume used
+			save-vars "last" 						# save the as the last Volume used
 
 		else									# if mount fails #Clean UP
 
